@@ -1,0 +1,181 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  fullName  String
+  phone     String?
+  avatarUrl String?
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  rideOffers     RideOffer[]
+  rideRequests   RideRequest[]
+  sentMessages   Message[]     @relation("MessageSender")
+  notifications  Notification[]
+  givenRatings   Rating[]      @relation("RatingRater")
+  receivedRatings Rating[]     @relation("RatingRated")
+
+  @@index([email])
+}
+
+enum RideOfferStatus {
+  ACTIVE
+  FULFILLED
+  CANCELLED
+  COMPLETED
+}
+
+model RideOffer {
+  id             String          @id @default(uuid())
+  driverId       String
+  origin         String
+  destination    String
+  departureTime  DateTime
+  availableSeats Int
+  price          Decimal?        @db.Decimal(10, 2)
+  description    String?
+  status         RideOfferStatus @default(ACTIVE)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  // Relations
+  driver   User       @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  matches  RideMatch[]
+
+  @@index([driverId])
+  @@index([status])
+  @@index([departureTime])
+}
+
+enum RideRequestStatus {
+  PENDING
+  MATCHED
+  CANCELLED
+  COMPLETED
+}
+
+model RideRequest {
+  id                   String            @id @default(uuid())
+  requesterId          String
+  origin               String
+  destination          String
+  preferredDepartureTime DateTime
+  flexibleTime         Boolean           @default(false)
+  maxPrice             Decimal?          @db.Decimal(10, 2)
+  description          String?
+  status               RideRequestStatus @default(PENDING)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  // Relations
+  requester User        @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+  matches   RideMatch[]
+
+  @@index([requesterId])
+  @@index([status])
+  @@index([preferredDepartureTime])
+}
+
+enum RideMatchStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
+
+model RideMatch {
+  id                String          @id @default(uuid())
+  offerId           String
+  requestId         String
+  status            RideMatchStatus @default(PENDING)
+  driverAccepted    Boolean         @default(false)
+  requesterAccepted Boolean         @default(false)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  // Relations
+  offer      RideOffer  @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  request    RideRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  messages   Message[]
+  ratings    Rating[]
+
+  @@unique([offerId, requestId])
+  @@index([status])
+  @@index([offerId])
+  @@index([requestId])
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  matchId   String
+  senderId  String
+  content   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Relations
+  match  RideMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  sender User      @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([matchId])
+  @@index([senderId])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  MATCH
+  MESSAGE
+  RIDE_UPDATE
+  RATING
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  read      Boolean          @default(false)
+  relatedId String?
+  createdAt DateTime         @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+}
+
+model Rating {
+  id          String   @id @default(uuid())
+  rideMatchId String
+  raterId     String
+  ratedUserId String
+  rating      Int      // 1-5
+  comment     String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  rideMatch  RideMatch @relation(fields: [rideMatchId], references: [id], onDelete: Cascade)
+  rater      User      @relation("RatingRater", fields: [raterId], references: [id], onDelete: Cascade)
+  ratedUser  User      @relation("RatingRated", fields: [ratedUserId], references: [id], onDelete: Cascade)
+
+  @@index([rideMatchId])
+  @@index([raterId])
+  @@index([ratedUserId])
+}
