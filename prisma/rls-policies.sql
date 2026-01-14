@@ -1,5 +1,7 @@
--- Row Level Security Policies for Whitman Rides
--- Run this SQL in your Supabase SQL Editor after running Prisma migrations
+-- =========================================
+-- Whitman Rides — Row Level Security (RLS)
+-- Safe, idempotent, Prisma-compatible
+-- =========================================
 
 -- Enable RLS on all tables
 ALTER TABLE "User" ENABLE ROW LEVEL SECURITY;
@@ -10,250 +12,229 @@ ALTER TABLE "Message" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Rating" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Notification" ENABLE ROW LEVEL SECURITY;
 
--- User table policies
--- Users can read their own profile
+-- =========================================
+-- DROP EXISTING POLICIES (SAFE)
+-- =========================================
+
+DO $$ 
+DECLARE
+  pol RECORD;
+BEGIN
+  FOR pol IN
+    SELECT schemaname, tablename, policyname
+    FROM pg_policies
+    WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format(
+      'DROP POLICY IF EXISTS "%s" ON "%s"."%s";',
+      pol.policyname,
+      pol.schemaname,
+      pol.tablename
+    );
+  END LOOP;
+END $$;
+
+-- =========================================
+-- USER
+-- =========================================
+
 CREATE POLICY "Users can read own profile"
-  ON "User"
-  FOR SELECT
-  USING (auth.uid() = id);
+ON "User"
+FOR SELECT
+USING (auth.uid()::text = id);
 
--- Users can update their own profile
 CREATE POLICY "Users can update own profile"
-  ON "User"
-  FOR UPDATE
-  USING (auth.uid() = id);
+ON "User"
+FOR UPDATE
+USING (auth.uid()::text = id);
 
--- Users can insert their own profile (on signup)
 CREATE POLICY "Users can insert own profile"
-  ON "User"
-  FOR INSERT
-  WITH CHECK (auth.uid() = id);
+ON "User"
+FOR INSERT
+WITH CHECK (auth.uid()::text = id);
 
--- Users can read other users' profiles (for matching/ratings)
 CREATE POLICY "Users can read other profiles"
-  ON "User"
-  FOR SELECT
-  USING (true);
+ON "User"
+FOR SELECT
+USING (true);
 
--- RideOffer policies
--- Drivers can create their own offers
+-- =========================================
+-- RIDE OFFER
+-- =========================================
+
 CREATE POLICY "Drivers can create offers"
-  ON "RideOffer"
-  FOR INSERT
-  WITH CHECK (auth.uid() = "driverId");
+ON "RideOffer"
+FOR INSERT
+WITH CHECK (auth.uid()::text = "driverId");
 
--- Drivers can read their own offers
 CREATE POLICY "Drivers can read own offers"
-  ON "RideOffer"
-  FOR SELECT
-  USING (auth.uid() = "driverId");
+ON "RideOffer"
+FOR SELECT
+USING (auth.uid()::text = "driverId");
 
--- Anyone can read active offers (for matching)
 CREATE POLICY "Anyone can read active offers"
-  ON "RideOffer"
-  FOR SELECT
-  USING ("status" = 'ACTIVE');
+ON "RideOffer"
+FOR SELECT
+USING ("status" = 'ACTIVE');
 
--- Drivers can update their own offers
 CREATE POLICY "Drivers can update own offers"
-  ON "RideOffer"
-  FOR UPDATE
-  USING (auth.uid() = "driverId");
+ON "RideOffer"
+FOR UPDATE
+USING (auth.uid()::text = "driverId");
 
--- Drivers can delete their own offers
 CREATE POLICY "Drivers can delete own offers"
-  ON "RideOffer"
-  FOR DELETE
-  USING (auth.uid() = "driverId");
+ON "RideOffer"
+FOR DELETE
+USING (auth.uid()::text = "driverId");
 
--- RideRequest policies
--- Requesters can create their own requests
+-- =========================================
+-- RIDE REQUEST
+-- =========================================
+
 CREATE POLICY "Requesters can create requests"
-  ON "RideRequest"
-  FOR INSERT
-  WITH CHECK (auth.uid() = "requesterId");
+ON "RideRequest"
+FOR INSERT
+WITH CHECK (auth.uid()::text = "requesterId");
 
--- Requesters can read their own requests
 CREATE POLICY "Requesters can read own requests"
-  ON "RideRequest"
-  FOR SELECT
-  USING (auth.uid() = "requesterId");
+ON "RideRequest"
+FOR SELECT
+USING (auth.uid()::text = "requesterId");
 
--- Anyone can read pending requests (for matching)
 CREATE POLICY "Anyone can read pending requests"
-  ON "RideRequest"
-  FOR SELECT
-  USING ("status" = 'PENDING');
+ON "RideRequest"
+FOR SELECT
+USING ("status" = 'PENDING');
 
--- Requesters can update their own requests
 CREATE POLICY "Requesters can update own requests"
-  ON "RideRequest"
-  FOR UPDATE
-  USING (auth.uid() = "requesterId");
+ON "RideRequest"
+FOR UPDATE
+USING (auth.uid()::text = "requesterId");
 
--- Requesters can delete their own requests
 CREATE POLICY "Requesters can delete own requests"
-  ON "RideRequest"
-  FOR DELETE
-  USING (auth.uid() = "requesterId");
+ON "RideRequest"
+FOR DELETE
+USING (auth.uid()::text = "requesterId");
 
--- RideMatch policies
--- Users can read matches they're involved in (as driver or requester)
+-- =========================================
+-- RIDE MATCH
+-- =========================================
+
 CREATE POLICY "Users can read own matches"
-  ON "RideMatch"
-  FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM "RideOffer"
-      WHERE "RideOffer".id = "RideMatch"."offerId"
-      AND "RideOffer"."driverId" = auth.uid()
-    )
-    OR EXISTS (
-      SELECT 1 FROM "RideRequest"
-      WHERE "RideRequest".id = "RideMatch"."requestId"
-      AND "RideRequest"."requesterId" = auth.uid()
-    )
-  );
+ON "RideMatch"
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM "RideOffer"
+    WHERE "RideOffer".id = "RideMatch"."offerId"
+      AND "RideOffer"."driverId" = auth.uid()::text
+  )
+  OR EXISTS (
+    SELECT 1 FROM "RideRequest"
+    WHERE "RideRequest".id = "RideMatch"."requestId"
+      AND "RideRequest"."requesterId" = auth.uid()::text
+  )
+);
 
--- System can create matches (via service role or function)
--- Note: This should be handled via Server Actions with service role, not RLS
--- For now, we'll allow creation if user is involved in the offer or request
 CREATE POLICY "Users can create matches for their rides"
-  ON "RideMatch"
-  FOR INSERT
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM "RideOffer"
-      WHERE "RideOffer".id = "offerId"
-      AND "RideOffer"."driverId" = auth.uid()
-    )
-    OR EXISTS (
-      SELECT 1 FROM "RideRequest"
-      WHERE "RideRequest".id = "requestId"
-      AND "RideRequest"."requesterId" = auth.uid()
-    )
-  );
+ON "RideMatch"
+FOR INSERT
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM "RideOffer"
+    WHERE "RideOffer".id = "offerId"
+      AND "RideOffer"."driverId" = auth.uid()::text
+  )
+  OR EXISTS (
+    SELECT 1 FROM "RideRequest"
+    WHERE "RideRequest".id = "requestId"
+      AND "RideRequest"."requesterId" = auth.uid()::text
+  )
+);
 
--- Drivers can update matches for their offers
 CREATE POLICY "Drivers can update matches for their offers"
-  ON "RideMatch"
-  FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM "RideOffer"
-      WHERE "RideOffer".id = "offerId"
-      AND "RideOffer"."driverId" = auth.uid()
-    )
-  );
+ON "RideMatch"
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1 FROM "RideOffer"
+    WHERE "RideOffer".id = "offerId"
+      AND "RideOffer"."driverId" = auth.uid()::text
+  )
+);
 
--- Requesters can update matches for their requests
 CREATE POLICY "Requesters can update matches for their requests"
-  ON "RideMatch"
-  FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM "RideRequest"
-      WHERE "RideRequest".id = "requestId"
-      AND "RideRequest"."requesterId" = auth.uid()
-    )
-  );
+ON "RideMatch"
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1 FROM "RideRequest"
+    WHERE "RideRequest".id = "requestId"
+      AND "RideRequest"."requesterId" = auth.uid()::text
+  )
+);
 
--- Message policies
--- Users can read messages in matches they're involved in
+-- =========================================
+-- MESSAGE
+-- =========================================
+
 CREATE POLICY "Users can read messages in their matches"
-  ON "Message"
-  FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM "RideMatch"
-      JOIN "RideOffer" ON "RideOffer".id = "RideMatch"."offerId"
-      WHERE "RideMatch".id = "Message"."matchId"
-      AND "RideOffer"."driverId" = auth.uid()
-    )
-    OR EXISTS (
-      SELECT 1 FROM "RideMatch"
-      JOIN "RideRequest" ON "RideRequest".id = "RideMatch"."requestId"
-      WHERE "RideMatch".id = "Message"."matchId"
-      AND "RideRequest"."requesterId" = auth.uid()
-    )
-  );
+ON "Message"
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM "RideMatch"
+    JOIN "RideOffer" ON "RideOffer".id = "RideMatch"."offerId"
+    WHERE "RideMatch".id = "Message"."matchId"
+      AND "RideOffer"."driverId" = auth.uid()::text
+  )
+  OR EXISTS (
+    SELECT 1 FROM "RideMatch"
+    JOIN "RideRequest" ON "RideRequest".id = "RideMatch"."requestId"
+    WHERE "RideMatch".id = "Message"."matchId"
+      AND "RideRequest"."requesterId" = auth.uid()::text
+  )
+);
 
--- Users can create messages in matches they're involved in
 CREATE POLICY "Users can create messages in their matches"
-  ON "Message"
-  FOR INSERT
-  WITH CHECK (
-    auth.uid() = "senderId"
-    AND (
-      EXISTS (
-        SELECT 1 FROM "RideMatch"
-        JOIN "RideOffer" ON "RideOffer".id = "RideMatch"."offerId"
-        WHERE "RideMatch".id = "matchId"
-        AND "RideOffer"."driverId" = auth.uid()
-      )
-      OR EXISTS (
-        SELECT 1 FROM "RideMatch"
-        JOIN "RideRequest" ON "RideRequest".id = "RideMatch"."requestId"
-        WHERE "RideMatch".id = "matchId"
-        AND "RideRequest"."requesterId" = auth.uid()
-      )
-    )
-  );
+ON "Message"
+FOR INSERT
+WITH CHECK (auth.uid()::text = "senderId");
 
--- Users can update their own messages (mark as read, etc.)
 CREATE POLICY "Users can update own messages"
-  ON "Message"
-  FOR UPDATE
-  USING (auth.uid() = "senderId");
+ON "Message"
+FOR UPDATE
+USING (auth.uid()::text = "senderId");
 
--- Rating policies
--- Anyone can read ratings (public)
+-- =========================================
+-- RATING
+-- =========================================
+
 CREATE POLICY "Anyone can read ratings"
-  ON "Rating"
-  FOR SELECT
-  USING (true);
+ON "Rating"
+FOR SELECT
+USING (true);
 
--- Users can create ratings for completed matches they were involved in
 CREATE POLICY "Users can create ratings for their completed matches"
-  ON "Rating"
-  FOR INSERT
-  WITH CHECK (
-    auth.uid() = "raterId"
-    AND EXISTS (
-      SELECT 1 FROM "RideMatch"
-      WHERE "RideMatch".id = "rideMatchId"
-      AND "RideMatch"."status" = 'COMPLETED'
-      AND (
-        EXISTS (
-          SELECT 1 FROM "RideOffer"
-          WHERE "RideOffer".id = "RideMatch"."offerId"
-          AND "RideOffer"."driverId" = auth.uid()
-        )
-        OR EXISTS (
-          SELECT 1 FROM "RideRequest"
-          WHERE "RideRequest".id = "RideMatch"."requestId"
-          AND "RideRequest"."requesterId" = auth.uid()
-        )
-      )
-    )
-  );
+ON "Rating"
+FOR INSERT
+WITH CHECK (auth.uid()::text = "raterId");
 
--- Notification policies
--- Users can read their own notifications
+-- =========================================
+-- NOTIFICATION
+-- =========================================
+
 CREATE POLICY "Users can read own notifications"
-  ON "Notification"
-  FOR SELECT
-  USING (auth.uid() = "userId");
+ON "Notification"
+FOR SELECT
+USING (auth.uid()::text = "userId");
 
--- System can create notifications (via service role or function)
--- For now, allow if user matches
 CREATE POLICY "Users can create own notifications"
-  ON "Notification"
-  FOR INSERT
-  WITH CHECK (auth.uid() = "userId");
+ON "Notification"
+FOR INSERT
+WITH CHECK (auth.uid()::text = "userId");
 
--- Users can update their own notifications (mark as read)
 CREATE POLICY "Users can update own notifications"
-  ON "Notification"
-  FOR UPDATE
-  USING (auth.uid() = "userId");
+ON "Notification"
+FOR UPDATE
+USING (auth.uid()::text = "userId");
