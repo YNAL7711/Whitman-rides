@@ -8,6 +8,21 @@ import Link from "next/link"
 import { Plus, Calendar, MapPin, Users, DollarSign } from "lucide-react"
 import { cancelRideOffer, cancelRideRequest } from "@/lib/actions/rides"
 
+// Server Actions wrapper functions for Next.js form actions
+async function cancelRideOfferAction(offerId: string, formData: FormData) {
+  const { error } = await cancelRideOffer(offerId)
+  if (error) {
+    console.error("Failed to cancel ride offer:", error)
+  }
+}
+
+async function cancelRideRequestAction(requestId: string, formData: FormData) {
+  const { error } = await cancelRideRequest(requestId)
+  if (error) {
+    console.error("Failed to cancel ride request:", error)
+  }
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient()
   const {
@@ -28,6 +43,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
@@ -135,7 +151,7 @@ export default async function DashboardPage() {
                         View Matches
                       </Button>
                     </Link>
-                    <form action={cancelRideOffer.bind(null, offer.id)}>
+                    <form action={(formData) => cancelRideOfferAction(offer.id, formData)}>
                       <Button type="submit" variant="destructive" size="sm">
                         Cancel
                       </Button>
@@ -202,7 +218,7 @@ export default async function DashboardPage() {
                         View Matches
                       </Button>
                     </Link>
-                    <form action={cancelRideRequest.bind(null, request.id)}>
+                    <form action={(formData) => cancelRideRequestAction(request.id, formData)}>
                       <Button type="submit" variant="destructive" size="sm">
                         Cancel
                       </Button>
@@ -217,3 +233,4 @@ export default async function DashboardPage() {
     </div>
   )
 }
+
