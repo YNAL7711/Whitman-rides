@@ -107,7 +107,7 @@ export async function createRideRequest(formData: FormData) {
   }
 }
 
-export async function cancelRideOffer(offerId: string) {
+export async function cancelRideOffer(offerId: string | FormData) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -117,9 +117,16 @@ export async function cancelRideOffer(offerId: string) {
     return { error: "Unauthorized" }
   }
 
+  // Handle both direct call and form action call
+  const id = offerId instanceof FormData ? offerId.get("offerId") as string : offerId
+
+  if (!id) {
+    return { error: "Offer ID is required" }
+  }
+
   try {
     const offer = await prisma.rideOffer.findUnique({
-      where: { id: offerId },
+      where: { id },
     })
 
     if (!offer || offer.driverId !== user.id) {
@@ -127,7 +134,7 @@ export async function cancelRideOffer(offerId: string) {
     }
 
     await prisma.rideOffer.update({
-      where: { id: offerId },
+      where: { id },
       data: { status: "CANCELLED" },
     })
 
@@ -139,7 +146,7 @@ export async function cancelRideOffer(offerId: string) {
   }
 }
 
-export async function cancelRideRequest(requestId: string) {
+export async function cancelRideRequest(requestId: string | FormData) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -149,9 +156,16 @@ export async function cancelRideRequest(requestId: string) {
     return { error: "Unauthorized" }
   }
 
+  // Handle both direct call and form action call
+  const id = requestId instanceof FormData ? requestId.get("requestId") as string : requestId
+
+  if (!id) {
+    return { error: "Request ID is required" }
+  }
+
   try {
     const request = await prisma.rideRequest.findUnique({
-      where: { id: requestId },
+      where: { id },
     })
 
     if (!request || request.requesterId !== user.id) {
@@ -159,7 +173,7 @@ export async function cancelRideRequest(requestId: string) {
     }
 
     await prisma.rideRequest.update({
-      where: { id: requestId },
+      where: { id },
       data: { status: "CANCELLED" },
     })
 

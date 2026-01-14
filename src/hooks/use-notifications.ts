@@ -1,31 +1,39 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { Notification } from "@prisma/client"
 
 export function useNotifications(userId: string | null) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
-  const supabase = createClient()
+  const supabaseRef = useRef(createClient())
 
   useEffect(() => {
-    if (!userId) return
+    if (!userId) {
+      setNotifications([])
+      setUnreadCount(0)
+      return
+    }
 
     // Fetch initial notifications
     const fetchNotifications = async () => {
-      const response = await fetch("/api/notifications")
-      if (response.ok) {
-        const data = await response.json()
-        setNotifications(data.notifications || [])
-        setUnreadCount(data.unreadCount || 0)
+      try {
+        const response = await fetch("/api/notifications")
+        if (response.ok) {
+          const data = await response.json()
+          setNotifications(data.notifications || [])
+          setUnreadCount(data.unreadCount || 0)
+        }
+      } catch (error) {
+        console.error("Error fetching notifications:", error)
       }
     }
 
     fetchNotifications()
 
     // Subscribe to new notifications
-    const channel = supabase
+    const channel = supabaseRef.current
       .channel(`notifications:${userId}`)
       .on(
         "postgres_changes",
@@ -36,7 +44,12 @@ export function useNotifications(userId: string | null) {
           filter: `userId=eq.${userId}`,
         },
         (payload) => {
-          setNotifications((prev) => [payload.new as Notification, ...prev])
+          setNotifications((prev) => {
+            // Avoid duplicates
+            const exists = prev.some((n) => n.id === payload.new.id)
+            if (exists) return prev
+            return [payload.new as Notification, ...prev]
+          })
           setUnreadCount((prev) => prev + 1)
         }
       )
@@ -64,9 +77,9 @@ export function useNotifications(userId: string | null) {
       .subscribe()
 
     return () => {
-      supabase.removeChannel(channel)
+      supabaseRef.current.removeChannel(channel)
     }
-  }, [userId, supabase])
+  }, [userId])
 
   return { notifications, unreadCount }
 }

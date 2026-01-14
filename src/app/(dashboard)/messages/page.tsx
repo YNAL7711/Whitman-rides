@@ -145,32 +145,38 @@ export default function MessagesPage() {
             </Card>
 
             <div className="flex-1 overflow-y-auto space-y-4 mb-4">
-              {messages.map((message: any) => {
-                const isOwn = message.senderId === currentUserId
-                return (
-                  <div
-                    key={message.id}
-                    className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
-                  >
+              {messages.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  No messages yet. Start the conversation!
+                </div>
+              ) : (
+                messages.map((message: any) => {
+                  const isOwn = message.senderId === currentUserId
+                  return (
                     <div
-                      className={`max-w-[70%] rounded-lg p-3 ${
-                        isOwn
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted"
-                      }`}
+                      key={message.id}
+                      className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
                     >
-                      <p className="text-sm">{message.content}</p>
-                      <p
-                        className={`text-xs mt-1 ${
-                          isOwn ? "text-primary-foreground/70" : "text-muted-foreground"
+                      <div
+                        className={`max-w-[70%] rounded-lg p-3 ${
+                          isOwn
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted"
                         }`}
                       >
-                        {new Date(message.createdAt).toLocaleTimeString()}
-                      </p>
+                        <p className="text-sm">{message.content}</p>
+                        <p
+                          className={`text-xs mt-1 ${
+                            isOwn ? "text-primary-foreground/70" : "text-muted-foreground"
+                          }`}
+                        >
+                          {new Date(message.createdAt).toLocaleTimeString()}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })
+              )}
             </div>
 
             <div className="flex gap-2">

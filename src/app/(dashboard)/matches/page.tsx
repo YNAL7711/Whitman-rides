@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { getMatches } from "@/lib/actions/matches"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { acceptMatch, rejectMatch } from "@/lib/actions/matches"
+import { handleAcceptMatch, handleRejectMatch } from "@/lib/actions/forms"
 import { Calendar, MapPin, Users, DollarSign, Check, X } from "lucide-react"
 import Link from "next/link"
 
@@ -130,19 +130,16 @@ export default async function MatchesPage() {
 
                     {match.status === "PENDING" && !userAccepted && (
                       <div className="flex gap-2 pt-2 border-t">
-                        <form
-                          action={acceptMatch.bind(
-                            null,
-                            match.id,
-                            isDriver ? "driver" : "requester"
-                          )}
-                        >
+                        <form action={handleAcceptMatch}>
+                          <input type="hidden" name="matchId" value={match.id} />
+                          <input type="hidden" name="userType" value={isDriver ? "driver" : "requester"} />
                           <Button type="submit" className="flex-1">
                             <Check className="mr-2 h-4 w-4" />
                             Accept
                           </Button>
                         </form>
-                        <form action={rejectMatch.bind(null, match.id)}>
+                        <form action={handleRejectMatch}>
+                          <input type="hidden" name="matchId" value={match.id} />
                           <Button type="submit" variant="destructive" className="flex-1">
                             <X className="mr-2 h-4 w-4" />
                             Reject

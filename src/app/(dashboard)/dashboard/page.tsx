@@ -6,22 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { Plus, Calendar, MapPin, Users, DollarSign } from "lucide-react"
-import { cancelRideOffer, cancelRideRequest } from "@/lib/actions/rides"
-
-// Server Actions wrapper functions for Next.js form actions
-async function cancelRideOfferAction(offerId: string, formData: FormData) {
-  const { error } = await cancelRideOffer(offerId)
-  if (error) {
-    console.error("Failed to cancel ride offer:", error)
-  }
-}
-
-async function cancelRideRequestAction(requestId: string, formData: FormData) {
-  const { error } = await cancelRideRequest(requestId)
-  if (error) {
-    console.error("Failed to cancel ride request:", error)
-  }
-}
+import { handleCancelOffer, handleCancelRequest } from "@/lib/actions/forms"
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -151,7 +136,8 @@ export default async function DashboardPage() {
                         View Matches
                       </Button>
                     </Link>
-                    <form action={(formData) => cancelRideOfferAction(offer.id, formData)}>
+                    <form action={handleCancelOffer}>
+                      <input type="hidden" name="offerId" value={offer.id} />
                       <Button type="submit" variant="destructive" size="sm">
                         Cancel
                       </Button>
@@ -218,7 +204,8 @@ export default async function DashboardPage() {
                         View Matches
                       </Button>
                     </Link>
-                    <form action={(formData) => cancelRideRequestAction(request.id, formData)}>
+                    <form action={handleCancelRequest}>
+                      <input type="hidden" name="requestId" value={request.id} />
                       <Button type="submit" variant="destructive" size="sm">
                         Cancel
                       </Button>

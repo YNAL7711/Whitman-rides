@@ -48,14 +48,14 @@ export async function findMatchesForOffer(offerId: string) {
             destination: offer.destination,
             departureTime: offer.departureTime,
             availableSeats: offer.availableSeats,
-            price: offer.price,
+            price: offer.price ? Number(offer.price) : null,
           },
           {
             origin: request.origin,
             destination: request.destination,
             preferredDepartureTime: request.preferredDepartureTime,
             flexibleTime: request.flexibleTime,
-            maxPrice: request.maxPrice,
+            maxPrice: request.maxPrice ? Number(request.maxPrice) : null,
           }
         )
       ) {
@@ -127,14 +127,14 @@ export async function findMatchesForRequest(requestId: string) {
             destination: offer.destination,
             departureTime: offer.departureTime,
             availableSeats: offer.availableSeats,
-            price: offer.price,
+            price: offer.price ? Number(offer.price) : null,
           },
           {
             origin: request.origin,
             destination: request.destination,
             preferredDepartureTime: request.preferredDepartureTime,
             flexibleTime: request.flexibleTime,
-            maxPrice: request.maxPrice,
+            maxPrice: request.maxPrice ? Number(request.maxPrice) : null,
           }
         )
       ) {

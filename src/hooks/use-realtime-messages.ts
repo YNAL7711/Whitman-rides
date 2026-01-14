@@ -1,15 +1,18 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { Message } from "@prisma/client"
 
 export function useRealtimeMessages(matchId: string | null) {
   const [messages, setMessages] = useState<Message[]>([])
-  const supabase = createClient()
+  const supabaseRef = useRef(createClient())
 
   useEffect(() => {
-    if (!matchId) return
+    if (!matchId) {
+      setMessages([])
+      return
+    }
 
     // Fetch initial messages
     const fetchMessages = async () => {
@@ -27,7 +30,7 @@ export function useRealtimeMessages(matchId: string | null) {
     fetchMessages()
 
     // Subscribe to new messages
-    const channel = supabase
+    const channel = supabaseRef.current
       .channel(`messages:${matchId}`)
       .on(
         "postgres_changes",
@@ -38,15 +41,20 @@ export function useRealtimeMessages(matchId: string | null) {
           filter: `matchId=eq.${matchId}`,
         },
         (payload) => {
-          setMessages((prev) => [...prev, payload.new as Message])
+          setMessages((prev) => {
+            // Avoid duplicates
+            const exists = prev.some((msg) => msg.id === payload.new.id)
+            if (exists) return prev
+            return [...prev, payload.new as Message]
+          })
         }
       )
       .subscribe()
 
     return () => {
-      supabase.removeChannel(channel)
+      supabaseRef.current.removeChannel(channel)
     }
-  }, [matchId, supabase])
+  }, [matchId])
 
   return messages
 }
